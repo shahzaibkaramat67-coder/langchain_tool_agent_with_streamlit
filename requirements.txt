@@ -39,3 +39,4 @@ OpenAI
 requests
 ollama
 langchain_ollama
+streamlit>=1.57

@@ -1,28 +1,14 @@
 from langchain.agents import create_agent
 from dotenv import load_dotenv
-from research_tool import duckduckgo_search
-from web_reader import read_webpage
+
 from calculator import calculator
 from model import resultModel
+from research_tool import duckduckgo_search
+from web_reader import read_webpage
 
 load_dotenv()
 
-# -----------------------------
-# INIT MODELS
-# -----------------------------
-agent_model = resultModel()
-formatter_model = resultModel()
-
-
-# thiiudbiuw ui1whiuew1 iue1wiud wqiud wudb w dywd w uy w duywbduyqwbduyqyu
-# -----------------------------
-# AGENT (STAGE 1)
-# -----------------------------
-agent = create_agent(
-    model=agent_model,
-    tools=[duckduckgo_search, calculator, read_webpage],
-    system_prompt="""
-
+SYSTEM_PROMPT = """
 Your job is to understand the user's request, decide which tools are necessary, use them efficiently, and produce accurate results.
 
 ## CORE RULES
@@ -128,37 +114,40 @@ When sources are requested, include the relevant source information from the too
 Return only the factual result needed for the user.
 
 Do not describe your internal reasoning or tool-selection process unless the user specifically asks for it.
-""",
-)
+"""
 
-# -----------------------------
-# LOOP
-# -----------------------------
-while True:
-    user_input = input("\n Ask Question: ")
 
-    if user_input.lower() == "exit":
-        break
+def create_research_agent(model):
+    return create_agent(
+        model=model,
+        tools=[duckduckgo_search, calculator, read_webpage],
+        system_prompt=SYSTEM_PROMPT,
+    )
 
-    # -------------------------
-    # STAGE 1: TOOL AGENT
-    # -------------------------
-    raw_result = agent.invoke({"messages": [{"role": "user", "content": user_input}]})
 
-    raw_text = raw_result["messages"][-1].content
+def run_cli():
+    agent_model = resultModel()
+    formatter_model = resultModel()
+    agent = create_research_agent(agent_model)
 
-    # -------------------------
-    # STAGE 2: FORMATTER LLM
-    # -------------------------
-    final_output = formatter_model.stream(
-        [
-            {
-                "role": "system",
-                "content": "Convert raw tool output into clean structured report.",
-            },
-            {
-                "role": "user",
-                "content": f"""
+    while True:
+        user_input = input("\n Ask Question: ")
+
+        if user_input.lower() == "exit":
+            break
+
+        raw_result = agent.invoke({"messages": [{"role": "user", "content": user_input}]})
+        raw_text = raw_result["messages"][-1].content
+
+        final_output = formatter_model.stream(
+            [
+                {
+                    "role": "system",
+                    "content": "Convert raw tool output into clean structured report.",
+                },
+                {
+                    "role": "user",
+                    "content": f"""
 User Question:
 {user_input}
 
@@ -170,12 +159,15 @@ Now convert into a clean structured answer with:
 - bullet points
 - short summary
 """,
-            },
-        ]
-    )
+                },
+            ]
+        )
 
-    print("\nFINAL ANSWER:\n")
+        print("\nFINAL ANSWER:\n")
+        for chunk in final_output:
+            if chunk.content:
+                print(chunk.content, end="", flush=True)
 
-    for chunk in final_output:
-        if chunk.content:
-            print(chunk.content, end="", flush=True)
+
+if __name__ == "__main__":
+    run_cli()
